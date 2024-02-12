@@ -148,7 +148,7 @@ app.post('/login', async(req, res) => {
 
 
 app.get('/',(request,response)=>{
-    db.all(`SELECT * FROM users`,(err,row)=>{
+    db.all(`SELECT * FROM loggedInUSers`,(err,row)=>{
         if(err){
             response.status(400).send('error fetching data');
         }else{
