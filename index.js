@@ -86,10 +86,10 @@ app.post('/sendOTP', async (req, res) => {
 
     const info = await transporter.sendMail(mailOptions);
     console.log('Email sent: ' + info.response);
-    res.status(200).send('OTP sent successfully');
+    res.status(200).send({'message':'OTP sent successfully'});
   } catch (error) {
     console.error(error);
-    res.status(500).send('Error sending OTP');
+    res.status(500).send({'message':'Error sending OTP'});
   }
 });
 
@@ -115,7 +115,7 @@ app.post('/login', async(req, res) => {
   db.get(`SELECT * FROM users WHERE email = ? AND otp = ? AND timestamp > ?`, [email, otp, expiryTimestamp], (err, row) => {
     if (err) {
       console.log(err);
-      res.status(500).send('Error verifying OTP');
+      res.status(500).send({'message':'Error verifying OTP'});
     } else if (row) {
       // OTP is valid
       // Generate JWT token
@@ -125,9 +125,9 @@ app.post('/login', async(req, res) => {
         db.run(`INSERT INTO loggedInUsers (email, register_date) VALUES (?, ?)`, [email, registerdDate], (err) => {
           if (err) {
             console.log(err);
-            res.status(400).send('Error inserting the data');
+            res.status(400).send({'message':'Error inserting the data'});
           } else {
-            res.status(200).json({ token: token });
+            res.status(200).json({ 'message':'Logged in successfully',token: token });
           }
         });
       }else{
@@ -135,13 +135,13 @@ app.post('/login', async(req, res) => {
       }
     } else {
       // OTP is invalid or expired
-      res.status(400).send('Invalid or expired OTP');
+      res.status(400).send({'message':'Invalid or expired OTP'});
     }
   });
   }
   catch (error){
     console.log(error);
-    res.status(500).send('Error verifying OTP');
+    res.status(500).send({'message':'Error verifying OTP'});
   }
 
 });
@@ -150,7 +150,7 @@ app.post('/login', async(req, res) => {
 app.get('/',(request,response)=>{
     db.all(`SELECT * FROM loggedInUSers`,(err,row)=>{
         if(err){
-            response.status(400).send('error fetching data');
+            response.status(400).send({'message':'error fetching data'});
         }else{
             response.send(row).status(200);
         }
