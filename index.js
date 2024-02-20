@@ -5,7 +5,7 @@ const nodemailer = require('nodemailer');
 const sqlite3 = require('sqlite3').verbose();
 const jwt= require('jsonwebtoken');
 const cors = require("cors");
-
+const {v4 : uuid} = require("uuid")
 const app = express();
 const port = 3000;
 const JWT_SECRET = 'login'
@@ -17,12 +17,25 @@ app.use(bodyParser.json());
 const db=new sqlite3.Database('examSafari.db');
 
 db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY,
-      email TEXT,
-      otp INTEGER,
-      timeStamp INTEGER
-    )`);
+    db.run(`CREATE TABLE loggedInUsers(
+      id VARCHAR PRIMARY KEY NOT NULL,
+      email VARCHAR,
+      register_date DATETIME
+    );`,(err)=>{
+      if(err){
+        console.log("table already created");
+      }else{
+        console.log("table created");
+      }
+    });
+    db.run('PRAGMA foreign_keys = ON;', (err) => {
+      if (err) {
+          console.error('Error enabling foreign key constraints', err);
+      } else {
+          console.log('Foreign key constraints enabled.');
+      }
+  });
+
   });
 
 const transporter = nodemailer.createTransport({
@@ -103,7 +116,7 @@ app.post('/login', async(req, res) => {
   console.log(expiryTimestamp);
   try{
     const existingUser = await new Promise((resolve, reject) => {
-      db.get(`SELECT email FROM users WHERE email = ?`, [email], (err, row) => {
+      db.get(`SELECT email FROM loggedInUsers WHERE email = ?`, [email], (err, row) => {
         if (err) {
           reject(err);
         } else {
@@ -119,10 +132,21 @@ app.post('/login', async(req, res) => {
     } else if (row) {
       // OTP is valid
       // Generate JWT token
-      const token = jwt.sign({ email: email }, JWT_SECRET, { expiresIn: '720h' }); // Token expires in 1 hour
+      const payload={
+        email:email
+      }
+      const token = jwt.sign(payload,"jwt_secret");
+      jwt.verify(token,'jwt_secret',async(error,response)=>{
+        if(error){
+          console.log("error")
+        }else{
+          console.log(response.email)
+        }
+      });
       // Use parameterized query to prevent SQL injection
       if(!existingUser){
-        db.run(`INSERT INTO loggedInUsers (email, register_date) VALUES (?, ?)`, [email, registerdDate], (err) => {
+        const randomId=uuid();
+        db.run(`INSERT INTO loggedInUsers (id, email, register_date) VALUES (?, ?, ?)`, [randomId, email, registerdDate], (err) => {
           if (err) {
             console.log(err);
             res.status(400).send({'message':'Error inserting the data'});
@@ -148,7 +172,7 @@ app.post('/login', async(req, res) => {
 
 
 app.get('/',(request,response)=>{
-    db.all(`SELECT * FROM loggedInUSers`,(err,row)=>{
+    db.all(`SELECT * FROM loggedInUsers`,(err,row)=>{
         if(err){
             response.status(400).send({'message':'error fetching data'});
         }else{
