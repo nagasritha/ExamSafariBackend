@@ -205,15 +205,16 @@ const authenticateToken = (request, response, next) => {
   const authHeader = request.headers["authorization"];
   if (authHeader !== undefined) {
     jwtToken = authHeader.split(" ")[1];
+    console.log(jwtToken);
   }
   if (jwtToken === undefined) {
     response.status(401);
-    response.send("JWT Token is not provided");
+    response.send({'message':"JWT Token is not provided"});
   } else {
     jwt.verify(jwtToken, "jwt_secret", async (error, payload) => {
       if (error) {
         response.status(401);
-        response.send("Invalid JWT Token");
+        response.send({'message':"Invalid JWT Token"});
       } else {
         request.email=payload.email;
         next();
