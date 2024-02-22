@@ -8,7 +8,7 @@ const cors = require("cors");
 const {v4 : uuid} = require("uuid")
 const app = express();
 const port = 3000;
-const JWT_SECRET = 'login'
+const multer=require('multer');
 app.use(cors());
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -17,17 +17,24 @@ app.use(bodyParser.json());
 const db=new sqlite3.Database('examSafari.db');
 
 db.serialize(() => {
-    db.run(`CREATE TABLE loggedInUsers(
+ 
+    db.run(`CREATE TABLE enquire(
       id VARCHAR PRIMARY KEY NOT NULL,
-      email VARCHAR,
-      register_date DATETIME
-    );`,(err)=>{
-      if(err){
-        console.log("table already created");
-      }else{
-        console.log("table created");
-      }
+      user_id VARCHAR,
+      name VARCHAR,
+      whatsapp_number INTEGER,
+      address VARCHAR,
+      exam_city VARCHAR,
+      exam_center VARCHAR,
+      admit_card_path VARCHAR,
+      FOREIGN KEY (user_id) REFERENCES loggedInUsers(id) );`, (err) => {
+        if (err) {
+            console.log("table already created");
+        } else {
+            console.log("table created");
+        }
     });
+
     db.run('PRAGMA foreign_keys = ON;', (err) => {
       if (err) {
           console.error('Error enabling foreign key constraints', err);
@@ -37,6 +44,17 @@ db.serialize(() => {
   });
 
   });
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+      cb(null, 'uploads/') // Store uploaded files in the 'uploads' directory
+  },
+  filename: function (req, file, cb) {
+      cb(null, file.originalname)
+  }
+});
+
+const upload = multer({ storage: storage });
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -136,6 +154,7 @@ app.post('/login', async(req, res) => {
         email:email
       }
       const token = jwt.sign(payload,"jwt_secret");
+      console.log(token);
       jwt.verify(token,'jwt_secret',async(error,response)=>{
         if(error){
           console.log("error")
@@ -180,6 +199,88 @@ app.get('/',(request,response)=>{
         }
     })
 });
+
+const extractToken = (req, res, next) => {
+  // Check if the authorization header is present
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    // Extract the token from the authorization header
+    const token = req.headers.authorization.split(' ')[1];
+    // Attach the token to the request object for further processing
+    jwt.verify(token,"jwt_secret",(err,payload)=>{
+       if(err){
+        res.send({message:"Invalid Token"});
+       }else{
+        req.email=payload.email;
+        next();
+       }
+    })
+  }
+};
+
+app.post('/submit-form', extractToken, upload.single('admitCard'), async (req, res) => {
+    const { name, whatsappNumber, address, examCity, examCenter } = req.body;
+    const email=req.email;
+    console.log(email)
+    userData=await new Promise((resolve,reject)=>{
+      db.get(`SELECT id FROM loggedInusers WHERE email=?;`,[email],(err,row)=>{
+        if(err){
+          reject("Error: error fetching the data");
+        }else{
+          resolve(row);
+        }
+      });
+    })
+    try {
+        const id = uuid(); // Generate a unique ID for the form submission
+        const user_id = await userData.id
+        console.log(user_id);
+        // Insert the form data into the database
+        await new Promise((resolve, reject) => {
+            db.run(`INSERT INTO enquire (id, user_id, name, whatsapp_number, address, exam_city, exam_center, admit_card_path)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+                [id, user_id, name, whatsappNumber, address, examCity, examCenter, req.file.path],
+                (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
+        });
+
+        res.status(200).send({ 'message': 'Form submitted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send({ 'message': 'Error submitting form' });
+    }
+});
+
+
+let dataPromise=null;
+let userData=null;
+app.get('/formDetails' ,extractToken, async(req,response)=>{
+
+
+  dataPromise = new Promise((resolve, reject) => {
+  db.all(`SELECT * FROM  enquire;`, (err, row) => {
+    if (err) {
+      reject("Error: error fetching the data");
+    } else {
+      resolve(row);
+    }
+  });
+});
+
+try {
+  const data = await dataPromise; // Wait for the promise to resolve
+  console.log(data); // This will log the fetched data
+  response.send(data).status(200);
+} catch (error) {
+  console.error(error); // Handle errors if any
+  response.send({message:"error fetching details"}).status(400);
+}
+
+})
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
