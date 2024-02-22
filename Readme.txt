@@ -14,3 +14,8 @@ database tables
    *id
    *email
    *register_date
+
+*enquire
+  
+  columns
+  *id
