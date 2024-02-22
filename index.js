@@ -200,26 +200,29 @@ app.get('/',(request,response)=>{
     })
 });
 
-const extractToken = (req, res, next) => {
-  // Check if the authorization header is present
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-    // Extract the token from the authorization header
-    const token = req.headers.authorization.split(' ')[1];
-    // Attach the token to the request object for further processing
-    jwt.verify(token, "jwt_secret", (err, payload) => {
-      if (err) {
-        res.status(401).send({ message: "Invalid Token" });
+const authenticateToken = (request, response, next) => {
+  let jwtToken;
+  const authHeader = request.headers["authorization"];
+  if (authHeader !== undefined) {
+    jwtToken = authHeader.split(" ")[1];
+  }
+  if (jwtToken === undefined) {
+    response.status(401);
+    response.send("JWT Token is not provided");
+  } else {
+    jwt.verify(jwtToken, "jwt_secret", async (error, payload) => {
+      if (error) {
+        response.status(401);
+        response.send("Invalid JWT Token");
       } else {
-        req.email = payload.email;
-        next(); // Proceed to the next middleware or route handler
+        request.email=payload.email;
+        next();
       }
     });
-  } else {
-    res.status(401).send({ message: "Unauthorized: Missing Authorization Header" });
   }
 };
 
-app.post('/submit-form', extractToken, upload.single('admitCard'), async (req, res) => {
+app.post('/submit-form', authenticateToken, upload.single('admitCard'), async (req, res) => {
   const { name, whatsappNumber, address, examCity, examCenter } = req.body;
   const email = req.email;
   console.log(email);
@@ -264,7 +267,7 @@ app.post('/submit-form', extractToken, upload.single('admitCard'), async (req, r
 
 let dataPromise=null;
 let userData=null;
-app.get('/formDetails' ,extractToken, async(req,response)=>{
+app.get('/formDetails' ,authenticateToken, async(req,response)=>{
   dataPromise = new Promise((resolve, reject) => {
   db.all(`SELECT * FROM  enquire;`, (err, row) => {
     if (err) {
@@ -278,7 +281,7 @@ app.get('/formDetails' ,extractToken, async(req,response)=>{
 try {
   const data = await dataPromise; // Wait for the promise to resolve
   console.log(data); // This will log the fetched data
-  response.send({'Enquire Details':data}).status(200);
+  response.send({' EnquireDetails':data}).status(200);
 } catch (error) {
   console.error(error); // Handle errors if any
   response.send({message:"error fetching details"}).status(400);
