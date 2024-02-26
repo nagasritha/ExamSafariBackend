@@ -282,10 +282,10 @@ app.get('/formDetails' ,authenticateToken, async(req,response)=>{
 try {
   const data = await dataPromise; // Wait for the promise to resolve
   console.log(data); // This will log the fetched data
-  response.send({' EnquireDetails':data}).status(200);
+  response.send({'EnquireDetails':data}).status(200);
 } catch (error) {
   console.error(error); // Handle errors if any
-  response.send({message:"error fetching details"}).status(400);
+  response.send({'message':"error fetching details"}).status(400);
 }
 
 })
