@@ -16,25 +16,31 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 const db=new sqlite3.Database('examSafari.db');
-
 db.serialize(() => {
  
-    db.run(`CREATE TABLE enquire(
-      id VARCHAR PRIMARY KEY NOT NULL,
-      user_id VARCHAR,
-      name VARCHAR,
-      whatsapp_number INTEGER,
-      address VARCHAR,
-      exam_city VARCHAR,
-      exam_center VARCHAR,
-      admit_card_path VARCHAR,
-      FOREIGN KEY (user_id) REFERENCES loggedInUsers(id) );`, (err) => {
-        if (err) {
-            console.log("table already created");
-        } else {
-            console.log("table created");
-        }
-    });
+  db.run(`CREATE TABLE profileDetails(
+    id VARCHAR PRIMARY KEY NOT NULL,
+    user_id VARCHAR,
+    image_url VARCHAR,
+    name VARCHAR,
+    education_status VARCHAR,
+    about VARCHAR,
+    phone_number INTEGER,
+    address VARCHAR,
+    country VARCHAR,
+    state VARCHAR,
+    email VARCHAR,
+    insta_profile VARCHAR,
+    twitter_profile VARCHAR,
+    facebook_profile VARCHAR,
+    linkedin_profile VARCHAR,
+    FOREIGN KEY (user_id) REFERENCES loggedInUsers(id) );`, (err) => {
+      if (err) {
+          console.log("table already created");
+      } else {
+          console.log("table created");
+      }
+  });
 
     db.run('PRAGMA foreign_keys = ON;', (err) => {
       if (err) {
@@ -218,6 +224,16 @@ const authenticateToken = (request, response, next) => {
         response.send({'message':"Invalid JWT Token"});
       } else {
         request.email=payload.email;
+        const userData = await new Promise((resolve, reject) => {
+          db.get(`SELECT id FROM loggedInusers WHERE email=?;`, [payload.email], (err, row) => {
+            if (err) {
+              reject("Error: error fetching the data");
+            } else {
+              resolve(row);
+            }
+          });
+        });
+        request.id=userData.id
         next();
       }
     });
@@ -230,21 +246,9 @@ app.post('/submit-form', authenticateToken, upload.single('admitCard'), async (r
   console.log(email);
   try {
     // Fetch user data from the database
-    const userData = await new Promise((resolve, reject) => {
-      db.get(`SELECT id FROM loggedInusers WHERE email=?;`, [email], (err, row) => {
-        if (err) {
-          reject("Error: error fetching the data");
-        } else {
-          resolve(row);
-        }
-      });
-    });
-    if (!userData) {
-      return res.status(404).send({ message: "User not found" });
-    }
 
     const id = uuid(); // Generate a unique ID for the form submission
-    const user_id = userData.id; // Accessing the user ID property
+    const user_id = req.id; // Accessing the user ID property
     // Insert the form data into the database
     const imageUrl=`https://examsafaribackend.onrender.com/uploads/${req.file.filename}`;
     await new Promise((resolve, reject) => {
@@ -267,9 +271,6 @@ app.post('/submit-form', authenticateToken, upload.single('admitCard'), async (r
   }
 });
 
-
-let dataPromise=null;
-let userData=null;
 app.get('/formDetails' ,authenticateToken, async(req,response)=>{
   dataPromise = new Promise((resolve, reject) => {
   db.all(`SELECT * FROM  enquire;`, (err, row) => {
@@ -291,6 +292,120 @@ try {
 }
 
 })
+
+app.post('/submit-profile', authenticateToken, upload.single('profileUrl'), async (req, res) => {
+  const { name, about,educationStatus,phoneNumber,address,country,state,instaProfile,twitterProfile,facebookProfile,linkedinProfile} = req.body;
+  const email = req.email;
+  console.log(email);
+  /*id VARCHAR PRIMARY KEY NOT NULL,
+    user_id VARCHAR,
+    image_url VARCHAR,
+    name VARCHAR,
+    education_status VARCHAR,
+    about VARCHAR,
+    phone_number INTEGER,
+    address VARCHAR,
+    country VARCHAR,
+    email VARCHAR,
+    insta_profile VARCHAR,
+    twitter_profile VARCHAR,
+    facebook_profile VARCHAR,
+    linkedin_profile VARCHAR,*/
+  try {
+    // Fetch user data from the database
+    const existingUser = await new Promise((resolve, reject) => {
+      db.get(`SELECT email FROM profileDetails WHERE email = ?`, [email], (err, row) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(row);
+        }
+      });
+    });
+    const id = uuid(); // Generate a unique ID for the form submission
+    const user_id = req.id; // Accessing the user ID property
+    // Insert the form data into the database
+    const imageUrl=`https://examsafaribackend.onrender.com/uploads/${req.file.filename}`;
+    if(!existingUser){
+    await new Promise((resolve, reject) => {
+      db.run(`INSERT INTO profileDetails (id, user_id, name, about, email, image_url, education_status, country, state, phone_number, address, insta_profile, twitter_profile, facebook_profile, linkedin_profile)
+              VALUES (?, ?, ?, ?, ?,?,?,?,?,?,?,?,?,?,?);`,
+        [id, user_id, name,about,email,imageUrl,educationStatus,country,state,phoneNumber,address,instaProfile,twitterProfile,facebookProfile,linkedinProfile],
+        (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+    });
+    res.status(200).send({ 'message': 'Form submitted successfully' });
+  }else{
+    await new Promise((resolve, reject) => {
+      db.run(`UPDATE profileDetails SET name = ?, image_url = ?, about = ?, education_status = ?, country = ?, state = ?, address = ?, insta_profile = ?, facebook_profile = ?, twitter_profile = ?, linkedin_profile = ?, phone_number = ? WHERE email = ?`, 
+                                                  [name, imageUrl, about, educationStatus, country, state, address, instaProfile,facebookProfile,twitterProfile,linkedinProfile, phoneNumber, email], (err) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      });
+    });
+    res.send({"message": "profile Updated Successfully"}).status(200);
+  }
+
+   
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ 'message': 'Error submitting form' });
+  }
+});
+
+app.get('/getProfileData' ,authenticateToken, async(req,response)=>{
+  const dataPromise = new Promise((resolve, reject) => {
+  db.all(`SELECT * FROM  profileDetails;`, (err, row) => {
+    if (err) {
+      reject("Error: error fetching the data");
+    } else {
+      resolve(row);
+    }
+  });
+});
+
+try {
+  const data = await dataPromise; // Wait for the promise to resolve
+  console.log(data); // This will log the fetched data
+  response.send({'UserProfiles':data}).status(200);
+} catch (error) {
+  console.error(error); // Handle errors if any
+  response.send({'message':"error fetching details"}).status(400);
+}
+
+});
+
+app.get('/getEachProfileData' ,authenticateToken, async(req,response)=>{
+  const dataPromise = new Promise((resolve, reject) => {
+  db.get(`SELECT * FROM  profileDetails WHERE email = ?;`,[req.email], (err, row) => {
+    if (err) {
+      reject("Error: error fetching the data");
+    } else {
+      resolve(row);
+    }
+  });
+});
+
+try {
+  const data = await dataPromise; // Wait for the promise to resolve
+  console.log(data); // This will log the fetched data
+  response.send({'UserProfiles':data}).status(200);
+} catch (error) {
+  console.error(error); // Handle errors if any
+  response.send({'message':"error fetching details"}).status(400);
+}
+
+})
+
+
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
