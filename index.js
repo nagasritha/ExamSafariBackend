@@ -245,10 +245,11 @@ app.post('/submit-form', authenticateToken, upload.single('admitCard'), async (r
     const id = uuid(); // Generate a unique ID for the form submission
     const user_id = userData.id; // Accessing the user ID property
     // Insert the form data into the database
+    const imageUrl=`https://examsafaribackend.onrender.com/uploads/${req.file.filename}`;
     await new Promise((resolve, reject) => {
       db.run(`INSERT INTO enquire (id, user_id, name, whatsapp_number, address, exam_city, exam_center, admit_card_path)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-        [id, user_id, name, whatsappNumber, address, examCity, examCenter, req.file.path],
+        [id, user_id, name, whatsappNumber, address, examCity, examCenter, imageUrl],
         (err) => {
           if (err) {
             reject(err);
