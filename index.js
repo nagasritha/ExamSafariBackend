@@ -233,7 +233,7 @@ const authenticateToken = (request, response, next) => {
             }
           });
         });
-        request.id=userData.id
+        request.id=userData.id;
         next();
       }
     });
