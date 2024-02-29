@@ -9,7 +9,11 @@ const {v4 : uuid} = require("uuid")
 const app = express();
 const port = 3000;
 const multer=require('multer');
-app.use(cors());
+const corsOptions = {
+  origin: 'https://warm-pika-268e69.netlify.app',
+};
+
+app.use(cors(corsOptions));
 
 app.use('/uploads', express.static('uploads'));
 app.use(bodyParser.urlencoded({ extended: true }));
